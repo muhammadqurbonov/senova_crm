@@ -1,0 +1,152 @@
+rules_version = '2';
+
+// Senova CRM — Firestore Security Rules
+// Принсипҳо:
+//  * Ҳар ҳуҷҷати ширкат orgId дорад; танҳо аъзои фаъоли ҳамон ширкат дастрасӣ дорад.
+//  * orgId, role, isSuperAdmin аз клиент ба таври ихтиёрӣ тағйир дода намешавад.
+//  * Super Admin ба маълумоти мизоҷони ширкатҳо дастрасӣ НАДОРАД (танҳо organizations/provisioning).
+//  * Ширкати боздошташуда (status == suspended) навиштанро қатъ мекунад, маълумот нест намешавад.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ───────── Функсияҳои ёрирасон ─────────
+    function signedIn() { return request.auth != null; }
+    function profilePath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile() { return signedIn() && exists(profilePath()); }
+    function me() { return get(profilePath()).data; }
+    function isActive() { return hasProfile() && me().get('active', true) == true; }
+    function myRole() { return me().get('role', 'viewer'); }
+    function isSuperAdmin() { return isActive() && me().get('isSuperAdmin', false) == true; }
+    function inOrg(orgId) { return isActive() && me().orgId == orgId; }
+    function isAdmin(orgId) { return inOrg(orgId) && myRole() == 'admin'; }
+    function orgActive(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)).data.get('status', 'active') != 'suspended';
+    }
+    function canWrite(orgId) {
+      return inOrg(orgId) && (myRole() == 'admin' || myRole() == 'manager') && orgActive(orgId);
+    }
+    function immutableOrg() { return request.resource.data.orgId == resource.data.orgId; }
+    function roleOk(r) { return r in ['admin', 'manager', 'viewer']; }
+
+    // ───────── organizations ─────────
+    match /organizations/{orgId} {
+      allow get: if isSuperAdmin() || inOrg(orgId);
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // ───────── users ─────────
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || inOrg(resource.data.orgId));
+      allow list: if inOrg(resource.data.orgId);
+
+      // Эҷоди профил: админи ширкат (барои ширкати худ) ё Super Admin (ширкати нав).
+      allow create: if (isAdmin(request.resource.data.orgId) || isSuperAdmin())
+        && roleOk(request.resource.data.role)
+        && request.resource.data.get('isSuperAdmin', false) == false
+        && request.resource.data.get('active', true) == true
+        && request.resource.data.keys().hasOnly(['name', 'email', 'login', 'orgId', 'role', 'isSuperAdmin', 'language', 'active']);
+
+      allow update: if signedIn() && (
+        // Худи корбар: танҳо забони UI ва токени push.
+        (request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uiLang', 'fcmToken'])
+          && request.resource.data.get('uiLang', 'ru') in ['ru', 'tj', 'en'])
+        // Админи ширкат: танҳо role ва active-и дигар кормандон.
+        || (isAdmin(resource.data.orgId) && request.auth.uid != uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'active'])
+          && roleOk(request.resource.data.role))
+      );
+
+      allow delete: if isAdmin(resource.data.orgId) && request.auth.uid != uid;
+    }
+
+    // ───────── loginIndex (логин -> email) ─────────
+    // get бе аутентификатсия лозим аст (вуруд бо логин). list манъ аст.
+    // ХАТАР: ҳар кас бо донистани логин email-ро мебинад — қ. docs/REPORT.md, "Хатарҳои боқимонда".
+    match /loginIndex/{login} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if (isAdmin(request.resource.data.orgId) || isSuperAdmin())
+        && request.resource.data.keys().hasOnly(['email', 'orgId', 'uid'])
+        && request.resource.data.email is string;
+      allow update: if false;
+      // Нест кардан: ҳуҷҷатҳои навъи нав — аз рӯи orgId. Ҳуҷҷатҳои кӯҳна (бе orgId) — то иҷрои
+      // scripts/migrate_login_index.js; баъд сатри "LEGACY" -ро ҳатман нест кунед.
+      allow delete: if isAdmin(resource.data.get('orgId', '')) 
+        || (!('orgId' in resource.data) && signedIn() && isActive() && myRole() == 'admin'); // LEGACY
+    }
+
+    // ───────── pipelineStages ─────────
+    match /pipelineStages/{stageId} {
+      allow read: if inOrg(resource.data.orgId);
+      allow create: if isSuperAdmin()
+        || (isAdmin(request.resource.data.orgId) && orgActive(request.resource.data.orgId)
+            && stageId.matches(request.resource.data.orgId + '_.*'));
+      allow update: if isAdmin(resource.data.orgId) && orgActive(resource.data.orgId) && immutableOrg();
+      allow delete: if isAdmin(resource.data.orgId);
+    }
+
+    // ───────── customers ─────────
+    match /customers/{id} {
+      allow read: if inOrg(resource.data.orgId);
+      allow create: if canWrite(request.resource.data.orgId)
+        && request.resource.data.get('managerId', null) in [null, request.auth.uid];
+      // Гирифтани лид: танҳо агар ҳоло менеҷер набошад; тағйири менеҷер аз ҷониби админ.
+      allow update: if canWrite(resource.data.orgId) && immutableOrg()
+        && (request.resource.data.get('managerId', null) == resource.data.get('managerId', null)
+            || isAdmin(resource.data.orgId)
+            || (resource.data.get('managerId', null) == null && request.resource.data.get('managerId', null) == request.auth.uid));
+      allow delete: if isAdmin(resource.data.orgId);
+    }
+
+    // ───────── properties ─────────
+    match /properties/{id} {
+      allow read: if inOrg(resource.data.orgId);
+      allow create: if canWrite(request.resource.data.orgId);
+      allow update: if canWrite(resource.data.orgId) && immutableOrg();
+      allow delete: if isAdmin(resource.data.orgId);
+    }
+
+    // ───────── deals ─────────
+    match /deals/{id} {
+      allow read: if inOrg(resource.data.orgId);
+      // Муҳофизат аз истинод ба ҳуҷҷатҳои ширкати дигар.
+      allow create: if canWrite(request.resource.data.orgId)
+        && request.resource.data.status == 'open'
+        && get(/databases/$(database)/documents/customers/$(request.resource.data.customerId)).data.orgId == request.resource.data.orgId
+        && get(/databases/$(database)/documents/properties/$(request.resource.data.propertyId)).data.orgId == request.resource.data.orgId;
+      allow update: if canWrite(resource.data.orgId) && immutableOrg()
+        && request.resource.data.customerId == resource.data.customerId
+        && request.resource.data.propertyId == resource.data.propertyId;
+      allow delete: if isAdmin(resource.data.orgId);
+    }
+
+    // ───────── tasks ─────────
+    match /tasks/{id} {
+      allow read: if inOrg(resource.data.orgId);
+      allow create: if canWrite(request.resource.data.orgId)
+        && (request.resource.data.assignedTo == request.auth.uid || isAdmin(request.resource.data.orgId));
+      allow update: if canWrite(resource.data.orgId) && immutableOrg()
+        && (resource.data.assignedTo == request.auth.uid || isAdmin(resource.data.orgId));
+      allow delete: if isAdmin(resource.data.orgId);
+    }
+
+    // ───────── notes ─────────
+    match /notes/{id} {
+      allow read: if inOrg(resource.data.orgId);
+      allow create: if canWrite(request.resource.data.orgId);
+      allow update: if false;
+      allow delete: if isAdmin(resource.data.orgId);
+    }
+
+    // ───────── auditLogs: фақат create; тағйир/нест кардан манъ ─────────
+    match /auditLogs/{id} {
+      allow read: if isAdmin(resource.data.orgId);
+      allow create: if (inOrg(request.resource.data.orgId) || isSuperAdmin())
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['orgId', 'actorUid', 'actorName', 'action', 'targetType', 'targetId', 'details', 'createdAt']);
+      allow update, delete: if false;
+    }
+  }
+}

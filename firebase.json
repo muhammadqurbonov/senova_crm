@@ -1,0 +1,21 @@
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "imkon-crm",
+          "configurations": {
+            "android": "1:842932591886:android:7f2ed8ba28849a07760b5f",
+            "web": "1:842932591886:web:d8824de0a3893620760b5f"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "eur3",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
