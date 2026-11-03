@@ -5,10 +5,13 @@ import '../../core/l10n/app_lang.dart';
 import '../../core/permissions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/custom_fields.dart';
+import '../../core/widgets/motion.dart';
 import '../../models/customer_model.dart';
 import '../../models/pipeline_stage_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/org_config_provider.dart';
 import '../../services/audit_service.dart';
 import '../../services/customer_service.dart';
 import '../../services/pipeline_stage_service.dart';
@@ -83,6 +86,7 @@ class _CustomersKanbanScreenState extends State<CustomersKanbanScreen> {
   void _showAddCustomerDialog(String stageKey) {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
+    final cf = CustomFieldsController(context.read<OrgConfigProvider>().config.customerFields, null);
     String? error;
     bool saving = false;
 
@@ -99,6 +103,7 @@ class _CustomersKanbanScreenState extends State<CustomersKanbanScreen> {
                 TextField(controller: nameCtrl, decoration: InputDecoration(labelText: ctx.tr('name'))),
                 const SizedBox(height: 10),
                 TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: ctx.tr('phone'))),
+                CustomFieldsForm(controller: cf),
                 if (error != null) ...[
                   const SizedBox(height: 10),
                   Text(error!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
@@ -118,12 +123,16 @@ class _CustomersKanbanScreenState extends State<CustomersKanbanScreen> {
                         setLocal(() => error = ctx.tr('err_name_or_phone'));
                         return;
                       }
+                      if (!cf.validate()) {
+                        setLocal(() => error = ctx.tr('err_custom_fields'));
+                        return;
+                      }
                       setLocal(() {
                         saving = true;
                         error = null;
                       });
                       try {
-                        await _customerService!.create(name: name, phone: phone, stageId: stageKey);
+                        await _customerService!.create(name: name, phone: phone, stageId: stageKey, custom: cf.collect());
                         if (ctx.mounted) Navigator.pop(ctx);
                       } catch (e) {
                         setLocal(() {
@@ -296,12 +305,14 @@ class _StageColumn extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          ...customers.map((c) => _CustomerCard(
-                customer: c,
+          ...customers.asMap().entries.map((e) => _CustomerCard(
+                key: ValueKey(e.value.id),
+                index: e.key,
+                customer: e.value,
                 canClaim: canClaim,
                 canDelete: canDelete,
-                onClaim: () => onClaim(c),
-                onDelete: () => onDelete(c),
+                onClaim: () => onClaim(e.value),
+                onDelete: () => onDelete(e.value),
               )),
         ],
       ),
@@ -310,6 +321,7 @@ class _StageColumn extends StatelessWidget {
 }
 
 class _CustomerCard extends StatelessWidget {
+  final int index;
   final Customer customer;
   final bool canClaim;
   final bool canDelete;
@@ -317,6 +329,8 @@ class _CustomerCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _CustomerCard({
+    super.key,
+    required this.index,
     required this.customer,
     required this.canClaim,
     required this.canDelete,
@@ -326,10 +340,15 @@ class _CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return FadeSlideIn(
+      delay: staggerDelay(index, stepMs: 35, maxMs: 300),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: HoverLift(
+          radius: 8,
+          child: InkWell(
       onTap: () => showDialog(context: context, builder: (_) => CustomerDetailDialog(customer: customer)),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.border, width: 0.5)),
         child: Column(
@@ -367,6 +386,9 @@ class _CustomerCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
+        ),
+      ),
     );
   }
 
@@ -378,6 +400,8 @@ class _CustomerCard extends StatelessWidget {
         return Icons.camera_alt_outlined;
       case LeadSource.telegram:
         return Icons.send_outlined;
+      case LeadSource.facebook:
+        return Icons.public;
       case LeadSource.manual:
         return Icons.edit_outlined;
     }

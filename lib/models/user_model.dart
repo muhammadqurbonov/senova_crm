@@ -1,3 +1,5 @@
+import '../core/constants.dart';
+
 enum UserRole { admin, manager, viewer }
 
 extension UserRoleX on UserRole {
@@ -58,4 +60,8 @@ class AppUser {
   }
 
   bool get isAdmin => role == UserRole.admin;
+  bool get isDemo => isDemoOrg(orgId);
+
+  /// Корбари демо: танҳо дидан, ба Firestore ворид намешавад.
+  factory AppUser.demo(String industry) => AppUser(uid: 'demo', name: 'Demo', email: '', orgId: '$kDemoPrefix$industry', role: UserRole.viewer);
 }

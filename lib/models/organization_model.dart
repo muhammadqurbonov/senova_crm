@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/constants.dart';
+import 'org_config.dart';
 
 class Organization {
   final String id;
@@ -7,6 +8,7 @@ class Organization {
   final String plan;
   final String status;
   final DateTime createdAt;
+  final OrgConfig config;
 
   Organization({
     required this.id,
@@ -14,6 +16,7 @@ class Organization {
     this.plan = 'free',
     this.status = OrgStatus.active,
     required this.createdAt,
+    this.config = const OrgConfig(),
   });
 
   bool get isSuspended => status == OrgStatus.suspended;
@@ -26,6 +29,7 @@ class Organization {
       plan: data['plan'] ?? 'free',
       status: data['status'] ?? OrgStatus.active,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      config: OrgConfig.fromMap(data),
     );
   }
 }

@@ -12,8 +12,9 @@ class Permissions {
   static bool canManageEmployees(AppUser u) => u.active && u.role == UserRole.admin;
   static bool canConfigureStages(AppUser u) => u.active && u.role == UserRole.admin;
   static bool canViewAudit(AppUser u) => u.active && u.role == UserRole.admin;
+  static bool canViewIntegrations(AppUser u) => u.active && u.role == UserRole.admin;
   static bool canManageOrganizations(AppUser u) => u.active && u.isSuperAdmin;
 
   static bool canAccessSettings(AppUser u) =>
-      canConfigureStages(u) || canManageEmployees(u) || canViewAudit(u) || canManageOrganizations(u);
+      canConfigureStages(u) || canManageEmployees(u) || canViewAudit(u) || canViewIntegrations(u) || canManageOrganizations(u);
 }

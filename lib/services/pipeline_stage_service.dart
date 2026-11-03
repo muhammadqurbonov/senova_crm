@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/constants.dart';
+import '../core/demo/demo_data.dart';
 import '../models/pipeline_stage_model.dart';
 
 class PipelineStageService {
@@ -9,6 +11,7 @@ class PipelineStageService {
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('pipelineStages');
 
   Stream<List<PipelineStage>> watchAll() {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.stages(orgId));
     return _col.where('orgId', isEqualTo: orgId).snapshots().map((snap) {
       final list = snap.docs.map(PipelineStage.fromDoc).toList();
       list.sort((a, b) => a.order.compareTo(b.order));

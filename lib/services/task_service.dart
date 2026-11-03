@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/demo/demo_data.dart';
 import '../core/constants.dart';
 import '../models/task_model.dart';
 
@@ -17,6 +18,7 @@ class TaskService {
   }
 
   Stream<List<AppTask>> watchByUser(String uid) {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.tasks(orgId));
     return _col
         .where('orgId', isEqualTo: orgId)
         .where('assignedTo', isEqualTo: uid)
@@ -31,6 +33,7 @@ class TaskService {
 
   /// Ҳамаи супоришҳои ширкат (барои dashboard).
   Stream<List<AppTask>> watchAll() {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.tasks(orgId));
     return _col.where('orgId', isEqualTo: orgId).limit(kQueryLimit).snapshots().map((snap) {
       final tasks = snap.docs.map(AppTask.fromDoc).toList();
       tasks.sort(_byDueDate);

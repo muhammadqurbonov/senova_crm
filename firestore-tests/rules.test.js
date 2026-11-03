@@ -110,3 +110,15 @@ test('audit log: manager cannot read', async () => {
   await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'auditLogs/l2'), { orgId: 'A', actorUid: 'x', action: 'x' }));
   return assertFails(getDoc(doc(as('mgrA'), 'auditLogs/l2')));
 });
+
+// ── Интегратсияҳо: клиент ба сирр дастрасӣ надорад ──
+test('integration secrets are never readable or writable by clients', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'integrationSecrets/A_telegram'), { botToken: 'x' }));
+  await assertFails(getDoc(doc(as('root'), 'integrationSecrets/A_telegram')));
+  await assertFails(getDoc(doc(as('adminA'), 'integrationSecrets/A_telegram')));
+  await assertFails(setDoc(doc(as('root'), 'integrationSecrets/B_telegram'), { botToken: 'y' }));
+});
+test('super admin can update organization config; org admin cannot', async () => {
+  await assertSucceeds(updateDoc(doc(as('root'), 'organizations/A'), { industry: 'clinic', modules: ['deals'] }));
+  await assertFails(updateDoc(doc(as('adminA'), 'organizations/A'), { industry: 'clinic' }));
+});

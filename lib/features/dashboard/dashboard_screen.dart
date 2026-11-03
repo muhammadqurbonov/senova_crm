@@ -4,6 +4,7 @@ import '../../core/format.dart';
 import '../../core/l10n/app_lang.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/motion.dart';
 import '../../models/customer_model.dart';
 import '../../models/deal_model.dart';
 import '../../models/pipeline_stage_model.dart';
@@ -107,14 +108,25 @@ class _Content extends StatelessWidget {
             crossAxisSpacing: 12,
             childAspectRatio: 1.7,
             children: [
-              _StatCard(label: context.tr('stat_total_leads'), value: '${m.totalLeads}'),
-              _StatCard(label: context.tr('stat_in_progress'), value: '${m.inProgress}'),
-              _StatCard(label: context.tr('stat_won'), value: '${m.won}', color: AppColors.accent),
-              _StatCard(label: context.tr('stat_conversion'), value: '${m.conversionPercent}%'),
-              _StatCard(label: context.tr('stat_open_deals'), value: '${m.openDeals}'),
-              _StatCard(label: context.tr('stat_pipeline_value'), value: context.money(m.openDealsValue)),
-              _StatCard(label: context.tr('stat_won_value'), value: context.money(m.wonDealsValue), color: AppColors.accent),
-              _StatCard(label: context.tr('stat_overdue_tasks'), value: '${m.overdueTasks}', color: m.overdueTasks > 0 ? AppColors.danger : AppColors.primaryLight),
+              for (final e in [
+                _StatDef('stat_total_leads', m.totalLeads.toDouble(), false, AppColors.primaryLight),
+                _StatDef('stat_in_progress', m.inProgress.toDouble(), false, AppColors.primaryLight),
+                _StatDef('stat_won', m.won.toDouble(), false, AppColors.accent),
+                _StatDef('stat_conversion', m.conversionPercent.toDouble(), false, AppColors.primaryLight, suffix: '%'),
+                _StatDef('stat_open_deals', m.openDeals.toDouble(), false, AppColors.primaryLight),
+                _StatDef('stat_pipeline_value', m.openDealsValue, true, AppColors.primaryLight),
+                _StatDef('stat_won_value', m.wonDealsValue, true, AppColors.accent),
+                _StatDef('stat_overdue_tasks', m.overdueTasks.toDouble(), false, m.overdueTasks > 0 ? AppColors.danger : AppColors.primaryLight),
+              ].asMap().entries)
+                FadeSlideIn(
+                  delay: staggerDelay(e.key, stepMs: 60),
+                  child: _StatCard(
+                    label: context.tr(e.value.key),
+                    value: e.value.value,
+                    format: (v) => e.value.money ? context.money(v) : '${formatAmount(v)}${e.value.suffix}',
+                    color: e.value.color,
+                  ),
+                ),
             ],
           );
         }),
@@ -137,6 +149,15 @@ class _Content extends StatelessWidget {
   }
 }
 
+class _StatDef {
+  final String key;
+  final double value;
+  final bool money;
+  final Color color;
+  final String suffix;
+  _StatDef(this.key, this.value, this.money, this.color, {this.suffix = ''});
+}
+
 class _StageBar extends StatelessWidget {
   final String label;
   final int count;
@@ -155,7 +176,12 @@ class _StageBar extends StatelessWidget {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: value, minHeight: 8, color: color, backgroundColor: AppColors.border),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: value),
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutCubic,
+                builder: (context, v, _) => LinearProgressIndicator(value: v, minHeight: 8, color: color, backgroundColor: AppColors.border),
+              ),
             ),
           ),
           SizedBox(width: 40, child: Text('$count', textAlign: TextAlign.right, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12.5))),
@@ -167,23 +193,30 @@ class _StageBar extends StatelessWidget {
 
 class _StatCard extends StatelessWidget {
   final String label;
-  final String value;
+  final double value;
+  final String Function(double) format;
   final Color color;
-  const _StatCard({required this.label, required this.value, this.color = AppColors.primaryLight});
+  const _StatCard({required this.label, required this.value, required this.format, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border, width: 0.5)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          const SizedBox(height: 6),
-          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w600))),
-        ],
+    return HoverLift(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border, width: 0.5)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: CountUp(value: value, format: format, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
       ),
     );
   }

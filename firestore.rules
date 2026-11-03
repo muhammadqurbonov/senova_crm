@@ -140,6 +140,11 @@ service cloud.firestore {
       allow delete: if isAdmin(resource.data.orgId);
     }
 
+    // ───────── Сирри интегратсияҳо ва индекси сервер: клиент ҳеҷ гоҳ дастрасӣ надорад ─────────
+    match /integrationSecrets/{id} { allow read, write: if false; }
+    match /integrationIndex/{id} { allow read, write: if false; }
+    match /processedMessages/{id} { allow read, write: if false; }
+
     // ───────── auditLogs: фақат create; тағйир/нест кардан манъ ─────────
     match /auditLogs/{id} {
       allow read: if isAdmin(resource.data.orgId);

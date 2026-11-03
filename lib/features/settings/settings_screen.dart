@@ -12,6 +12,10 @@ import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/constants.dart';
 import '../../services/audit_service.dart';
+import '../../core/industries.dart';
+import '../../core/industries_data.dart';
+import '../../providers/org_config_provider.dart';
+import 'org_editor_dialog.dart';
 import '../../services/employee_service.dart';
 import '../../services/organization_service.dart';
 import '../../services/pipeline_stage_service.dart';
@@ -35,6 +39,7 @@ class SettingsScreen extends StatelessWidget {
       if (Permissions.canConfigureStages(me)) const MapEntry('tab_stages', _StagesTab()),
       if (Permissions.canManageEmployees(me)) const MapEntry('tab_employees', _EmployeesTab()),
       if (Permissions.canViewAudit(me)) const MapEntry('tab_audit', _AuditTab()),
+      if (Permissions.canViewIntegrations(me)) const MapEntry('tab_integrations', _IntegrationsTab()),
       if (Permissions.canManageOrganizations(me)) const MapEntry('tab_organizations', _OrganizationsTab()),
     ];
 
@@ -618,6 +623,11 @@ class _OrganizationsTabState extends State<_OrganizationsTab> {
                           decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
                           child: Text(context.tr(o.isSuspended ? 'org_status_suspended' : 'org_status_active'), style: TextStyle(color: color, fontSize: 11)),
                         ),
+                        IconButton(
+                          tooltip: context.tr('edit_org'),
+                          icon: const Icon(Icons.tune, size: 18, color: AppColors.primaryLight),
+                          onPressed: () => showDialog(context: context, builder: (_) => OrgEditorDialog(org: o, me: me)),
+                        ),
                         TextButton(
                           onPressed: () => _run(() async {
                             final next = o.isSuspended ? OrgStatus.active : OrgStatus.suspended;
@@ -656,6 +666,7 @@ class _OrganizationsTabState extends State<_OrganizationsTab> {
     final loginCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
+    String industry = 'real_estate';
     bool loading = false;
     String? error;
 
@@ -670,6 +681,15 @@ class _OrganizationsTabState extends State<_OrganizationsTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(controller: orgNameCtrl, decoration: InputDecoration(labelText: ctx.tr('org_name'))),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: industry,
+                  isExpanded: true,
+                  dropdownColor: AppColors.surface,
+                  decoration: InputDecoration(labelText: ctx.tr('industry')),
+                  items: [for (final id in kIndustryOrder) DropdownMenuItem(value: id, child: Text(presetOf(id).name(ctx.lang)))],
+                  onChanged: (v) => setLocal(() => industry = v ?? industry),
+                ),
                 const Divider(color: AppColors.border, height: 24),
                 Align(alignment: Alignment.centerLeft, child: Text(ctx.tr('first_admin'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))),
                 const SizedBox(height: 8),
@@ -709,6 +729,7 @@ class _OrganizationsTabState extends State<_OrganizationsTab> {
                           adminLogin: login,
                           adminEmail: emailCtrl.text.trim(),
                           adminPassword: passCtrl.text,
+                          industry: industry,
                         );
                         AuditService(orgId).log(me, 'org.create', targetType: 'organization', targetId: orgId, details: orgNameCtrl.text.trim());
                         if (ctx.mounted) Navigator.pop(ctx);
@@ -724,6 +745,41 @@ class _OrganizationsTabState extends State<_OrganizationsTab> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+// ───────────────────────────── Integrations (admin, read-only) ─────────────────────────────
+
+class _IntegrationsTab extends StatelessWidget {
+  const _IntegrationsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = context.watch<OrgConfigProvider>().config;
+    return ListView(
+      padding: const EdgeInsets.only(top: 12),
+      children: [
+        Text(context.tr('int_admin_hint'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+        const SizedBox(height: 12),
+        for (final ch in kChannels)
+          _card(
+            child: Row(
+              children: [
+                Expanded(child: Text(context.tr('int_$ch'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 13))),
+                Builder(builder: (context) {
+                  final st = cfg.integrations[ch];
+                  final ok = st?['status'] == 'connected';
+                  return Text(
+                    ok ? '${context.tr('int_status_connected')}${st?['label'] == null ? '' : ' · ${st?['label']}'}' : context.tr('int_status_not_connected'),
+                    style: TextStyle(color: ok ? AppColors.accent : AppColors.textSecondary, fontSize: 12),
+                  );
+                }),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

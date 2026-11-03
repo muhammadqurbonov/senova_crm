@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/demo/demo_data.dart';
 import '../core/constants.dart';
 import '../models/property_model.dart';
 
@@ -10,6 +11,7 @@ class PropertyService {
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('properties');
 
   Stream<List<Property>> watchAll() {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.items(orgId));
     return _col.where('orgId', isEqualTo: orgId).limit(kQueryLimit).snapshots().map((snap) {
       final list = snap.docs.map(Property.fromDoc).toList();
       list.sort((a, b) => a.price.compareTo(b.price));

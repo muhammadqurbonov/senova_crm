@@ -18,6 +18,7 @@ dynamic = ['role_admin','role_manager','role_viewer','pstatus_available','pstatu
            'filter_all','filter_open','filter_closed','filter_rejected','deal_open','deal_closed','deal_closed_won','deal_rejected',
            'nav_dashboard','nav_customers','nav_properties','nav_deals','nav_tasks','nav_settings',
            'tab_stages','tab_employees','tab_audit','tab_organizations','org_status_active','org_status_suspended','activate','suspend']
+dynamic += ['int_telegram','int_whatsapp','int_instagram','int_facebook','module_items','module_deals','module_tasks','type_text','type_number','type_select','type_bool','type_date']
 dynamic += [f'err_{x}' for x in ['invalid_credentials','profile_missing','account_disabled','generic','network','permission_denied','email_in_use','weak_password','too_many_requests','login_taken']]
 used.update(dynamic)
 for k in sorted(used):
@@ -72,6 +73,24 @@ for p in files:
     for n, line in enumerate(open(p, encoding='utf-8').read().split('\n'), 1):
         if re.search(r'const\s+(Text|InputDecoration|Tab)\([^;]*\btr\(', line):
             errors.append(f'const + tr() at {os.path.relpath(p, root)}:{n}: {line.strip()[:90]}')
+
+
+# 6. extension helpers need their import (context.tr/.lang -> app_lang, context.money -> format)
+need={r'\.tr\(|context\.lang|ctx\.lang':'core/l10n/app_lang.dart', r'\.money\(':'core/format.dart'}
+for p in files:
+    rel=os.path.relpath(p, root).replace(os.sep,'/')
+    s=open(p, encoding='utf-8').read()
+    for pat, imp in need.items():
+        if rel==imp or rel=='core/l10n/app_lang.dart': continue
+        if re.search(pat, s) and imp not in s:
+            errors.append(f'MISSING import {imp} in {rel}')
+
+# 7. industry overrides must reference existing base keys
+for k,d in gen_strings.INDUSTRIES.items():
+    if d['nouns']:
+        for lang in gen_strings.overrides(d['nouns']):
+            for key in lang:
+                if key not in T: errors.append(f'industry {k}: unknown override key {key}')
 
 print(f'files={len(files)} keys_in_dict={len(T)} keys_used={len(used)} unused_keys={unused}')
 print('\n'.join(errors) if errors else 'ALL CHECKS PASSED')

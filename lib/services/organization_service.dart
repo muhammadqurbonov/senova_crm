@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants.dart';
 import '../core/errors.dart';
 import '../models/organization_model.dart';
-import '../models/pipeline_stage_model.dart';
+import '../core/industries.dart';
 
 class OrganizationService {
   final _db = FirebaseFirestore.instance;
@@ -28,6 +28,7 @@ class OrganizationService {
     required String adminLogin,
     required String adminEmail,
     required String adminPassword,
+    String industry = 'real_estate',
   }) async {
     final normalizedLogin = adminLogin.trim().toLowerCase();
     final email = adminEmail.trim();
@@ -56,9 +57,11 @@ class OrganizationService {
         'name': orgName,
         'plan': 'free',
         'status': OrgStatus.active,
+        'industry': industry,
+        'modules': ['items', 'deals', 'tasks'],
         'createdAt': FieldValue.serverTimestamp(),
       });
-      for (final stage in defaultStagesData(orgId)) {
+      for (final stage in stagesDataFor(industry, orgId)) {
         final id = stage['id'] as String;
         final data = Map<String, dynamic>.from(stage)..remove('id');
         batch.set(_db.collection('pipelineStages').doc('${orgId}_$id'), data);
@@ -90,6 +93,11 @@ class OrganizationService {
       } catch (_) {}
       await secondaryApp.delete();
     }
+  }
+
+  /// Танзимоти ширкат (соҳа, модулҳо, номҳо, майдонҳои иловагӣ, тариф). Танҳо Super Admin (rules).
+  Future<void> updateConfig(String orgId, Map<String, dynamic> data) {
+    return _db.collection('organizations').doc(orgId).update(data);
   }
 
   /// Боздоштан/фаъол кардани ширкат. Маълумот нест намешавад.

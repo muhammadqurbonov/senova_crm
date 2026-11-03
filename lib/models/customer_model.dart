@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum LeadSource { whatsapp, instagram, telegram, manual }
+enum LeadSource { whatsapp, instagram, telegram, facebook, manual }
 
 extension LeadSourceX on LeadSource {
   String get value => name;
@@ -19,6 +19,7 @@ class Customer {
   final String? managerId;
   final String? managerName;
   final List<String> tags;
+  final Map<String, dynamic> custom;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -32,6 +33,7 @@ class Customer {
     this.managerId,
     this.managerName,
     this.tags = const [],
+    this.custom = const {},
     required this.createdAt,
     required this.updatedAt,
   });
@@ -50,6 +52,7 @@ class Customer {
       managerId: data['managerId'],
       managerName: data['managerName'],
       tags: List<String>.from(data['tags'] ?? []),
+      custom: Map<String, dynamic>.from(data['custom'] ?? {}),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -65,6 +68,7 @@ class Customer {
       'managerId': managerId,
       'managerName': managerName,
       'tags': tags,
+      'custom': custom,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': FieldValue.serverTimestamp(),
     };

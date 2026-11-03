@@ -9,18 +9,11 @@ class NavItem {
   const NavItem({required this.icon, required this.labelKey});
 }
 
-const navItems = [
-  NavItem(icon: Icons.dashboard_outlined, labelKey: 'nav_dashboard'),
-  NavItem(icon: Icons.people_outline, labelKey: 'nav_customers'),
-  NavItem(icon: Icons.apartment_outlined, labelKey: 'nav_properties'),
-  NavItem(icon: Icons.handshake_outlined, labelKey: 'nav_deals'),
-  NavItem(icon: Icons.check_circle_outline, labelKey: 'nav_tasks'),
-];
-
 const settingsNavItem = NavItem(icon: Icons.settings_outlined, labelKey: 'nav_settings');
 
 /// Layout-и ягона: экрани васеъ (веб/планшет) — sidebar; экрани танг (мобилӣ) — bottom navigation.
 class ResponsiveScaffold extends StatelessWidget {
+  final List<NavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final Widget child;
@@ -32,6 +25,7 @@ class ResponsiveScaffold extends StatelessWidget {
 
   const ResponsiveScaffold({
     super.key,
+    required this.items,
     required this.selectedIndex,
     required this.onSelect,
     required this.child,
@@ -53,6 +47,7 @@ class ResponsiveScaffold extends StatelessWidget {
         body: Row(
           children: [
             _Sidebar(
+              items: items,
               selectedIndex: selectedIndex,
               onSelect: onSelect,
               userName: userName,
@@ -67,8 +62,8 @@ class ResponsiveScaffold extends StatelessWidget {
       );
     }
 
-    final destinations = <NavItem>[...navItems, if (showSettings) settingsNavItem];
-    final settingsIndex = navItems.length;
+    final destinations = <NavItem>[...items, if (showSettings) settingsNavItem];
+    final settingsIndex = items.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -115,6 +110,7 @@ class ResponsiveScaffold extends StatelessWidget {
 }
 
 class _Sidebar extends StatelessWidget {
+  final List<NavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final String userName;
@@ -124,6 +120,7 @@ class _Sidebar extends StatelessWidget {
   final VoidCallback onLogout;
 
   const _Sidebar({
+    required this.items,
     required this.selectedIndex,
     required this.onSelect,
     required this.userName,
@@ -156,8 +153,8 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-          for (int i = 0; i < navItems.length; i++)
-            _SidebarTile(item: navItems[i], selected: !settingsSelected && i == selectedIndex, onTap: () => onSelect(i)),
+          for (int i = 0; i < items.length; i++)
+            _SidebarTile(item: items[i], selected: !settingsSelected && i == selectedIndex, onTap: () => onSelect(i)),
           if (showSettings) ...[
             const Divider(color: AppColors.border, height: 32, indent: 20, endIndent: 20),
             _SidebarTile(item: settingsNavItem, selected: settingsSelected, onTap: onSettingsTap),
@@ -185,7 +182,7 @@ class _Sidebar extends StatelessWidget {
   }
 }
 
-class _SidebarTile extends StatelessWidget {
+class _SidebarTile extends StatefulWidget {
   final NavItem item;
   final bool selected;
   final VoidCallback onTap;
@@ -193,22 +190,45 @@ class _SidebarTile extends StatelessWidget {
   const _SidebarTile({required this.item, required this.selected, required this.onTap});
 
   @override
+  State<_SidebarTile> createState() => _SidebarTileState();
+}
+
+class _SidebarTileState extends State<_SidebarTile> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.16) : null,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(item.icon, size: 19, color: selected ? AppColors.primaryLight : AppColors.textSecondary),
-            const SizedBox(width: 12),
-            Text(context.tr(item.labelKey), style: TextStyle(color: selected ? AppColors.textPrimary : AppColors.textSecondary, fontSize: 13.5)),
-          ],
+    final selected = widget.selected;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          margin: EdgeInsets.only(left: _hover && !selected ? 16 : 12, right: 12, top: 3, bottom: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary.withValues(alpha: 0.16) : (_hover ? AppColors.primary.withValues(alpha: 0.07) : Colors.transparent),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(widget.item.icon, size: 19, color: selected ? AppColors.primaryLight : AppColors.textSecondary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(context.tr(widget.item.labelKey), overflow: TextOverflow.ellipsis, style: TextStyle(color: selected ? AppColors.textPrimary : AppColors.textSecondary, fontSize: 13.5)),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                width: selected ? 8 : 0,
+                height: 8,
+                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+              ),
+            ],
+          ),
         ),
       ),
     );

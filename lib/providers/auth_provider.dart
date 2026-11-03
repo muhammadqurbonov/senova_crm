@@ -24,6 +24,7 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider() {
     _sub = _authService.authStateChanges.listen((firebaseUser) async {
       if (firebaseUser == null) {
+        if (_user?.isDemo == true) return; // демо ба Firebase вобаста нест
         _user = null;
         _status = AuthStatus.unauthenticated;
         notifyListeners();
@@ -67,19 +68,29 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Ҳолати демо: бе вуруд, танҳо дидан, маълумоти хаёлӣ (аз Firestore хонда намешавад).
+  void enterDemo(String industry) {
+    _error = null;
+    _user = AppUser.demo(industry);
+    _status = AuthStatus.authenticated;
+    notifyListeners();
+  }
+
   Future<void> resetPassword(String login) => _authService.resetPasswordByLogin(login);
 
   Future<void> logout() async {
     _user = null; // дарҳол: экранҳо ва listener-ҳои ширкати қаблӣ пӯшида мешаванд
     _status = AuthStatus.unauthenticated;
     notifyListeners();
-    await _authService.logout();
+    try {
+      await _authService.logout();
+    } catch (_) {}
   }
 
   /// Забони интихобшударо дар профил нигоҳ медорад (агар корбар даромада бошад).
   Future<void> saveLanguage(String code) async {
     final u = _user;
-    if (u == null) return;
+    if (u == null || u.isDemo) return;
     try {
       await _authService.saveLanguage(u.uid, code);
     } catch (_) {

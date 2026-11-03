@@ -6,6 +6,7 @@ import '../../core/l10n/app_lang.dart';
 import '../../core/permissions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/custom_fields.dart';
 import '../../models/customer_model.dart';
 import '../../models/deal_model.dart';
 import '../../models/note_model.dart';
@@ -13,12 +14,14 @@ import '../../models/pipeline_stage_model.dart';
 import '../../models/property_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/org_config_provider.dart';
 import '../../services/audit_service.dart';
 import '../../services/customer_service.dart';
 import '../../services/deal_service.dart';
 import '../../services/note_service.dart';
 import '../../services/pipeline_stage_service.dart';
 import '../../services/property_service.dart';
+import '../../models/org_config.dart';
 
 class CustomerDetailDialog extends StatefulWidget {
   final Customer customer;
@@ -31,6 +34,7 @@ class CustomerDetailDialog extends StatefulWidget {
 class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
   final _noteCtrl = TextEditingController();
   late String _currentStageId;
+  late Customer _c;
 
   AppUser? _me;
   NoteService? _noteService;
@@ -43,6 +47,7 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
   @override
   void initState() {
     super.initState();
+    _c = widget.customer;
     _currentStageId = widget.customer.stageId;
     final me = context.read<AuthProvider>().user;
     if (me != null) {
@@ -64,10 +69,11 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.customer;
+    final c = _c;
     final me = _me;
     if (me == null) return const SizedBox();
     final canWrite = Permissions.canWrite(me);
+    final fields = context.watch<OrgConfigProvider>().config.customerFields;
 
     return Dialog(
       backgroundColor: AppColors.surface,
@@ -82,12 +88,21 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
               Row(
                 children: [
                   Expanded(child: Text(c.name.isEmpty ? c.phone : c.name, style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600))),
+                  if (canWrite)
+                    IconButton(
+                      tooltip: context.tr('edit_customer'),
+                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.textSecondary),
+                      onPressed: () => _showEditDialog(c, fields),
+                    ),
                   IconButton(icon: const Icon(Icons.close, color: AppColors.textSecondary), onPressed: () => Navigator.pop(context)),
                 ],
               ),
               _infoRow(context.tr('phone'), c.phone),
               _infoRow(context.tr('source'), c.source.value),
               _infoRow(context.tr('manager'), c.managerName ?? context.tr('not_claimed')),
+              for (final f in fields)
+                if (c.custom[f.id] != null)
+                  _infoRow(f.label, displayCustomValue(f, c.custom[f.id], yes: context.tr('yes'), no: context.tr('no'))),
               const SizedBox(height: 10),
               StreamBuilder<List<PipelineStage>>(
                 stream: _stagesStream,
@@ -143,7 +158,7 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
                         labelColor: AppColors.primaryLight,
                         unselectedLabelColor: AppColors.textSecondary,
                         indicatorColor: AppColors.primary,
-                        tabs: [Tab(text: context.tr('tab_notes')), Tab(text: context.tr('tab_deals'))],
+                        tabs: [Tab(text: context.tr('tab_notes')), Tab(text: context.tr('nav_deals'))],
                       ),
                       Expanded(child: TabBarView(children: [_notesTab(c, me, canWrite), _dealsTab(c, me, canWrite)])),
                     ],
@@ -152,6 +167,89 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(Customer c, List<CustomFieldDef> fields) {
+    final nameCtrl = TextEditingController(text: c.name);
+    final phoneCtrl = TextEditingController(text: c.phone);
+    final cf = CustomFieldsController(fields, c.custom);
+    String? error;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text(ctx.tr('edit_customer'), style: const TextStyle(color: AppColors.textPrimary)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameCtrl, decoration: InputDecoration(labelText: ctx.tr('name'))),
+                const SizedBox(height: 10),
+                TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: ctx.tr('phone'))),
+                CustomFieldsForm(controller: cf),
+                if (error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(error!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(ctx.tr('cancel'))),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final phone = phoneCtrl.text.trim();
+                      if (name.isEmpty && phone.isEmpty) {
+                        setLocal(() => error = ctx.tr('err_name_or_phone'));
+                        return;
+                      }
+                      if (!cf.validate()) {
+                        setLocal(() => error = ctx.tr('err_custom_fields'));
+                        return;
+                      }
+                      setLocal(() {
+                        saving = true;
+                        error = null;
+                      });
+                      try {
+                        final custom = cf.collect();
+                        await _customerService!.update(c.id, name: name, phone: phone, custom: custom);
+                        if (mounted) {
+                          setState(() => _c = Customer(
+                                id: c.id,
+                                orgId: c.orgId,
+                                name: name,
+                                phone: phone,
+                                source: c.source,
+                                stageId: c.stageId,
+                                managerId: c.managerId,
+                                managerName: c.managerName,
+                                tags: c.tags,
+                                custom: custom,
+                                createdAt: c.createdAt,
+                                updatedAt: DateTime.now(),
+                              ));
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      } catch (e) {
+                        setLocal(() {
+                          saving = false;
+                          error = ctx.tr(errorKeyFor(e));
+                        });
+                      }
+                    },
+              child: Text(ctx.tr('save')),
+            ),
+          ],
         ),
       ),
     );

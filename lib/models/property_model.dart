@@ -22,6 +22,7 @@ class Property {
   final PropertyStatus status;
   final List<String> photos;
   final bool mortgageAvailable;
+  final Map<String, dynamic> custom;
 
   Property({
     required this.id,
@@ -37,6 +38,7 @@ class Property {
     this.status = PropertyStatus.available,
     this.photos = const [],
     this.mortgageAvailable = false,
+    this.custom = const {},
   });
 
   String title(String lang) {
@@ -60,6 +62,7 @@ class Property {
       status: PropertyStatusX.fromString(data['status']),
       photos: List<String>.from(data['photos'] ?? []),
       mortgageAvailable: data['mortgageAvailable'] ?? false,
+      custom: Map<String, dynamic>.from(data['custom'] ?? {}),
     );
   }
 
@@ -77,6 +80,7 @@ class Property {
       'status': status.value,
       'photos': photos,
       'mortgageAvailable': mortgageAvailable,
+      'custom': custom,
     };
   }
 }

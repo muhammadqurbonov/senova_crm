@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/demo/demo_data.dart';
 import '../core/constants.dart';
 import '../models/customer_model.dart';
 
@@ -10,6 +11,7 @@ class CustomerService {
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('customers');
 
   Stream<List<Customer>> watchAll() {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.customers(orgId));
     return _col.where('orgId', isEqualTo: orgId).limit(kQueryLimit).snapshots().map((snap) {
       final list = snap.docs.map(Customer.fromDoc).toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -33,7 +35,12 @@ class CustomerService {
     return _col.doc(customerId).update({'stageId': newStageKey, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
-  Future<void> create({required String name, required String phone, required String stageId}) {
+  Future<void> create({
+    required String name,
+    required String phone,
+    required String stageId,
+    Map<String, dynamic> custom = const {},
+  }) {
     return _col.add({
       'orgId': orgId,
       'name': name,
@@ -42,9 +49,14 @@ class CustomerService {
       'stageId': stageId,
       'managerId': null,
       'tags': <String>[],
+      'custom': custom,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> update(String customerId, {required String name, required String phone, required Map<String, dynamic> custom}) {
+    return _col.doc(customerId).update({'name': name, 'phone': phone, 'custom': custom, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> delete(String customerId) {

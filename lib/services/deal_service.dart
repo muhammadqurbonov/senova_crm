@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/demo/demo_data.dart';
 import '../core/constants.dart';
 import '../models/deal_model.dart';
 
@@ -10,6 +11,7 @@ class DealService {
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('deals');
 
   Stream<List<Deal>> watchAll() {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.deals(orgId));
     return _col.where('orgId', isEqualTo: orgId).limit(kQueryLimit).snapshots().map((snap) {
       final list = snap.docs.map(Deal.fromDoc).toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -18,6 +20,9 @@ class DealService {
   }
 
   Stream<List<Deal>> watchByCustomer(String customerId) {
+    if (isDemoOrg(orgId)) {
+      return Stream.value(DemoData.deals(orgId).where((d) => d.customerId == customerId).toList());
+    }
     return _col
         .where('orgId', isEqualTo: orgId)
         .where('customerId', isEqualTo: customerId)

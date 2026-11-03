@@ -6,6 +6,7 @@ import '../../core/l10n/app_lang.dart';
 import '../../core/permissions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/motion.dart';
 import '../../models/customer_model.dart';
 import '../../models/deal_model.dart';
 import '../../models/property_model.dart';
@@ -108,12 +109,16 @@ class _DealsScreenState extends State<DealsScreen> {
 
                       return ListView.builder(
                         itemCount: deals.length,
-                        itemBuilder: (context, i) => _DealTile(
-                          deal: deals[i],
-                          customerName: customerNames[deals[i].customerId] ?? '—',
-                          propertyTitle: propertyTitles[deals[i].propertyId] ?? '—',
-                          canDelete: canDelete,
-                          onDelete: () => _delete(deals[i]),
+                        itemBuilder: (context, i) => FadeSlideIn(
+                          key: ValueKey(deals[i].id),
+                          delay: staggerDelay(i),
+                          child: _DealTile(
+                            deal: deals[i],
+                            customerName: customerNames[deals[i].customerId] ?? '—',
+                            propertyTitle: propertyTitles[deals[i].propertyId] ?? '—',
+                            canDelete: canDelete,
+                            onDelete: () => _delete(deals[i]),
+                          ),
                         ),
                       );
                     },

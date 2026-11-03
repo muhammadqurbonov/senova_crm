@@ -6,6 +6,7 @@ import '../../core/l10n/app_lang.dart';
 import '../../core/permissions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/motion.dart';
 import '../../models/customer_model.dart';
 import '../../models/task_model.dart';
 import '../../models/user_model.dart';
@@ -94,7 +95,10 @@ class _TasksScreenState extends State<TasksScreen> {
                     itemBuilder: (context, i) {
                       final t = tasks[i];
                       final overdue = t.dueDate != null && t.dueDate!.isBefore(DateTime.now()) && !t.done;
-                      return Container(
+                      return FadeSlideIn(
+                        key: ValueKey(t.id),
+                        delay: staggerDelay(i),
+                        child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: overdue ? AppColors.danger : AppColors.border, width: 0.5)),
@@ -117,6 +121,7 @@ class _TasksScreenState extends State<TasksScreen> {
                                 onPressed: () => _delete(t),
                               ),
                           ],
+                        ),
                         ),
                       );
                     },

@@ -23,3 +23,11 @@ class OrgStatus {
 }
 
 const List<String> kLanguages = ['ru', 'tj', 'en'];
+
+/// Ширкатҳои демо: orgId = 'demo_<industry>'. Ба Firestore ҳеҷ вақт дастрасӣ намешавад.
+const String kDemoPrefix = 'demo_';
+bool isDemoOrg(String orgId) => orgId.startsWith(kDemoPrefix);
+String demoIndustryOf(String orgId) => orgId.substring(kDemoPrefix.length);
+
+const List<String> kPlans = ['free', 'starter', 'pro', 'business'];
+const List<String> kChannels = ['telegram', 'whatsapp', 'instagram', 'facebook'];

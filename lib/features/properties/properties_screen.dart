@@ -6,9 +6,13 @@ import '../../core/l10n/app_lang.dart';
 import '../../core/permissions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/custom_fields.dart';
+import '../../core/widgets/motion.dart';
 import '../../models/property_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/org_config_provider.dart';
+import '../../models/org_config.dart';
 import '../../services/audit_service.dart';
 import '../../services/property_service.dart';
 
@@ -69,6 +73,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     if (me == null) return const SizedBox();
     final canWrite = Permissions.canWrite(me);
     final canDelete = Permissions.canDelete(me);
+    final itemFields = context.watch<OrgConfigProvider>().config.itemFields;
 
     return SafeArea(
       child: Padding(
@@ -115,12 +120,19 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.25),
                       itemCount: props.length,
-                      itemBuilder: (context, i) => _PropertyCard(
-                        property: props[i],
-                        canWrite: canWrite,
-                        canDelete: canDelete,
-                        onDelete: () => _delete(props[i]),
-                        onStatus: (s) => _setStatus(props[i], s),
+                      itemBuilder: (context, i) => FadeSlideIn(
+                        key: ValueKey(props[i].id),
+                        delay: staggerDelay(i),
+                        child: HoverLift(
+                          child: _PropertyCard(
+                            property: props[i],
+                            fields: itemFields,
+                            canWrite: canWrite,
+                            canDelete: canDelete,
+                            onDelete: () => _delete(props[i]),
+                            onStatus: (s) => _setStatus(props[i], s),
+                          ),
+                        ),
                       ),
                     );
                   });
@@ -140,6 +152,8 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     final districtCtrl = TextEditingController();
     final roomsCtrl = TextEditingController();
     final areaCtrl = TextEditingController();
+    final cfg = context.read<OrgConfigProvider>().config;
+    final cf = CustomFieldsController(cfg.itemFields, null);
     String? error;
     bool saving = false;
 
@@ -158,12 +172,15 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                 TextField(controller: titleRuCtrl, decoration: InputDecoration(labelText: ctx.tr('title_ru'))),
                 const SizedBox(height: 10),
                 TextField(controller: priceCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: ctx.tr('price'))),
+                if (cfg.isRealEstate) ...[
                 const SizedBox(height: 10),
                 TextField(controller: roomsCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: ctx.tr('rooms'))),
                 const SizedBox(height: 10),
                 TextField(controller: areaCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: ctx.tr('area'))),
                 const SizedBox(height: 10),
                 TextField(controller: districtCtrl, decoration: InputDecoration(labelText: ctx.tr('district'))),
+                ],
+                CustomFieldsForm(controller: cf),
                 if (error != null) ...[
                   const SizedBox(height: 10),
                   Text(error!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
@@ -182,6 +199,10 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                         setLocal(() => error = ctx.tr('err_property_fields'));
                         return;
                       }
+                      if (!cf.validate()) {
+                        setLocal(() => error = ctx.tr('err_custom_fields'));
+                        return;
+                      }
                       setLocal(() {
                         saving = true;
                         error = null;
@@ -196,6 +217,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                           rooms: int.tryParse(roomsCtrl.text.trim()),
                           area: double.tryParse(areaCtrl.text.trim().replaceAll(',', '.')),
                           district: districtCtrl.text.trim(),
+                          custom: cf.collect(),
                         ));
                         if (ctx.mounted) Navigator.pop(ctx);
                       } catch (e) {
@@ -216,11 +238,12 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
 
 class _PropertyCard extends StatelessWidget {
   final Property property;
+  final List<CustomFieldDef> fields;
   final bool canWrite;
   final bool canDelete;
   final VoidCallback onDelete;
   final ValueChanged<PropertyStatus> onStatus;
-  const _PropertyCard({required this.property, required this.canWrite, required this.canDelete, required this.onDelete, required this.onStatus});
+  const _PropertyCard({required this.property, required this.fields, required this.canWrite, required this.canDelete, required this.onDelete, required this.onStatus});
 
   Color _statusColor(PropertyStatus s) {
     switch (s) {
@@ -255,6 +278,8 @@ class _PropertyCard extends StatelessWidget {
           if (p.rooms != null)
             Text('${context.tr('rooms_short', {'n': '${p.rooms}'})} · ${p.area != null ? formatAmount(p.area!) : '-'} ${context.tr('sqm')}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
           if (p.district.isNotEmpty) Text(p.district, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+          for (final f in fields.where((f) => p.custom[f.id] != null).take(2))
+            Text('${f.label}: ${displayCustomValue(f, p.custom[f.id], yes: context.tr('yes'), no: context.tr('no'))}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
           const SizedBox(height: 6),
           if (canWrite)
             PopupMenuButton<PropertyStatus>(

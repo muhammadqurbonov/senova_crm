@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/demo/demo_data.dart';
 import '../core/constants.dart';
 import '../models/note_model.dart';
 
@@ -9,6 +10,7 @@ class NoteService {
   final _db = FirebaseFirestore.instance;
 
   Stream<List<Note>> watchByCustomer(String customerId) {
+    if (isDemoOrg(orgId)) return Stream.value(DemoData.notes(orgId, customerId));
     return _db
         .collection('notes')
         .where('orgId', isEqualTo: orgId)

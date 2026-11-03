@@ -68,13 +68,3 @@ class PipelineStage {
     );
   }
 }
-
-/// Stage-ҳои пешфарз барои ширкати нав. Калиди 'id' танҳо барои сохтани ID-и ҳуҷҷат истифода мешавад.
-List<Map<String, dynamic>> defaultStagesData(String orgId) => [
-      {'id': 'lid_nav', 'key': 'lid_nav', 'name_tj': 'Лид нав', 'name_ru': 'Новый лид', 'name_en': 'New lead', 'order': 0, 'color': '#63A4FF', 'type': 'open', 'orgId': orgId},
-      {'id': 'tamos', 'key': 'tamos', 'name_tj': 'Тамос гирифта шуд', 'name_ru': 'Контакт установлен', 'name_en': 'Contacted', 'order': 1, 'color': '#8FA3BF', 'type': 'open', 'orgId': orgId},
-      {'id': 'nishondihi', 'key': 'nishondihi', 'name_tj': 'Нишондиҳии мулк', 'name_ru': 'Показ объекта', 'name_en': 'Viewing', 'order': 2, 'color': '#2F80ED', 'type': 'open', 'orgId': orgId},
-      {'id': 'muzokira', 'key': 'muzokira', 'name_tj': 'Музокира', 'name_ru': 'Переговоры', 'name_en': 'Negotiation', 'order': 3, 'color': '#F5A524', 'type': 'open', 'orgId': orgId},
-      {'id': 'mizoj_shud', 'key': 'mizoj_shud', 'name_tj': 'Мизоҷ шуд', 'name_ru': 'Стал клиентом', 'name_en': 'Won', 'order': 4, 'color': '#22C55E', 'type': 'won', 'orgId': orgId},
-      {'id': 'rad_kard', 'key': 'rad_kard', 'name_tj': 'Рад кард', 'name_ru': 'Отказ', 'name_en': 'Lost', 'order': 5, 'color': '#EF5350', 'type': 'lost', 'orgId': orgId},
-    ];

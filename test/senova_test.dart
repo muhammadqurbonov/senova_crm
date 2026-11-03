@@ -3,6 +3,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 
+import 'package:imkon_crm/core/constants.dart';
+import 'package:imkon_crm/core/demo/demo_data.dart';
+import 'package:imkon_crm/core/industries.dart';
+import 'package:imkon_crm/core/industries_data.dart';
+import 'package:imkon_crm/models/org_config.dart';
 import 'package:imkon_crm/core/l10n/app_lang.dart';
 import 'package:imkon_crm/core/l10n/app_strings.dart';
 import 'package:imkon_crm/core/permissions.dart';
@@ -142,6 +147,99 @@ void main() {
       expect(AppColors.fromHex('#22C55E'), const Color(0xFF22C55E));
       expect(AppColors.fromHex('garbage'), AppColors.primary);
       expect(AppColors.fromHex('#GGGGGG'), AppColors.primary);
+    });
+  });
+
+  group('Industries', () {
+    test('every industry has 6 stages with won and lost keys', () {
+      for (final id in kIndustryOrder) {
+        final p = presetOf(id);
+        expect(p.stages.length, 6, reason: id);
+        expect(p.stages.any((s) => s.key == StageKeys.won && s.type == 'won'), isTrue, reason: id);
+        expect(p.stages.any((s) => s.key == StageKeys.lost && s.type == 'lost'), isTrue, reason: id);
+        expect(p.demoItems, isNotEmpty, reason: id);
+      }
+    });
+    test('overrides are complete in all languages and use real keys', () {
+      for (final id in kIndustryOrder) {
+        final p = presetOf(id);
+        if (p.overrides.isEmpty) continue; // real_estate = пешфарз
+        final ru = p.overrides['ru']!.keys.toSet();
+        expect(p.overrides['tj']!.keys.toSet(), ru, reason: id);
+        expect(p.overrides['en']!.keys.toSet(), ru, reason: id);
+        for (final k in ru) {
+          expect(kStrings['ru']!.containsKey(k), isTrue, reason: '$id: $k');
+        }
+      }
+    });
+    test('terminology follows industry, custom label wins', () {
+      expect(S.lookup('ru', 'nav_customers', null, 'clinic'), 'Пациенты');
+      expect(S.lookup('en', 'nav_deals', null, 'clinic'), 'Appointments');
+      expect(S.lookup('ru', 'nav_customers', null, 'real_estate'), 'Клиенты');
+      expect(S.lookup('ru', 'nav_customers', null, 'clinic', {'nav_customers': 'Гости'}), 'Гости');
+      expect(S.lookup('ru', 'sign_in', null, 'clinic'), 'Войти');
+    });
+    test('stagesDataFor builds documents for an org', () {
+      final docs = stagesDataFor('clinic', 'org1');
+      expect(docs.length, 6);
+      expect(docs.every((d) => d['orgId'] == 'org1'), isTrue);
+      expect(docs.map((d) => d['key']).toSet().length, 6);
+    });
+  });
+
+  group('OrgConfig', () {
+    test('legacy organization defaults to real estate with all modules', () {
+      final c = OrgConfig.fromMap({});
+      expect(c.industry, 'real_estate');
+      expect(c.hasModule('deals') && c.hasModule('items') && c.hasModule('tasks'), isTrue);
+      expect(c.customerFields, isEmpty);
+    });
+    test('parses modules, labels and custom fields', () {
+      final c = OrgConfig.fromMap({
+        'industry': 'clinic',
+        'modules': ['deals'],
+        'labels': {'customers': 'Гости'},
+        'customFields': {
+          'customer': [
+            {'id': 'a', 'label': 'Дата рождения', 'type': 'date'},
+            {'id': 'b', 'label': 'Группа', 'type': 'select', 'options': ['A', 'B'], 'required': true},
+            {'id': '', 'label': 'bad'},
+          ],
+        },
+      });
+      expect(c.hasModule('items'), isFalse);
+      expect(c.customerFields.length, 2);
+      expect(c.customerFields[1].required, isTrue);
+      expect(c.overrides['nav_customers'], 'Гости');
+    });
+    test('unknown field type falls back to text', () {
+      expect(CustomFieldDef.fromMap({'id': 'x', 'label': 'L', 'type': 'weird'}).type, 'text');
+    });
+  });
+
+  group('Demo', () {
+    test('demo user is read-only and recognised', () {
+      final u = AppUser.demo('clinic');
+      expect(u.isDemo, isTrue);
+      expect(Permissions.canWrite(u), isFalse);
+      expect(Permissions.canAccessSettings(u), isFalse);
+      expect(isDemoOrg(u.orgId), isTrue);
+      expect(demoIndustryOf(u.orgId), 'clinic');
+    });
+    test('demo data is internally consistent for every industry', () {
+      for (final id in kIndustryOrder) {
+        final org = '$kDemoPrefix$id';
+        final stages = DemoData.stages(org);
+        final customers = DemoData.customers(org);
+        final items = DemoData.items(org);
+        for (final c in customers) {
+          expect(stages.any((s) => s.matches(c.stageId)), isTrue, reason: '$id ${c.id}');
+        }
+        for (final d in DemoData.deals(org)) {
+          expect(customers.any((c) => c.id == d.customerId), isTrue, reason: '$id ${d.id}');
+          expect(items.any((p) => p.id == d.propertyId), isTrue, reason: '$id ${d.id}');
+        }
+      }
     });
   });
 }

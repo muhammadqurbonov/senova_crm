@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/l10n/app_lang.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/industries.dart';
+import '../../core/industries_data.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/motion.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -47,8 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     return Scaffold(
-      body: Stack(
-        children: [
+      body: AnimatedBackdrop(
+        child: Stack(
+          children: [
           if (isWide)
             Row(
               children: [
@@ -59,7 +63,8 @@ class _LoginScreenState extends State<LoginScreen> {
           else
             SafeArea(child: formPane),
           const Positioned(top: 8, right: 8, child: SafeArea(child: LanguageMenu())),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -71,16 +76,12 @@ class _BrandPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primaryDark.withValues(alpha: 0.55), AppColors.background, AppColors.accentDark.withValues(alpha: 0.35)],
-        ),
-      ),
       padding: const EdgeInsets.all(48),
       alignment: Alignment.centerLeft,
-      child: Column(
+      child: FadeSlideIn(
+        duration: const Duration(milliseconds: 800),
+        offset: const Offset(-0.04, 0),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -91,6 +92,7 @@ class _BrandPanel extends StatelessWidget {
           const SizedBox(height: 12),
           Text(context.tr('brand_tagline'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 15)),
         ],
+        ),
       ),
     );
   }
@@ -117,7 +119,9 @@ class _LoginForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return FadeSlideIn(
+      delay: const Duration(milliseconds: 150),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -176,7 +180,81 @@ class _LoginForm extends StatelessWidget {
             child: Text(context.tr('forgot_password'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           ),
         ),
+        const SizedBox(height: 8),
+        Row(children: [
+          const Expanded(child: Divider(color: AppColors.border)),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(context.tr('or_divider'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))),
+          const Expanded(child: Divider(color: AppColors.border)),
+        ]),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => showDemoPicker(context),
+          icon: const Icon(Icons.visibility_outlined, size: 18),
+          label: Text(context.tr('try_demo')),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.accent,
+            side: const BorderSide(color: AppColors.accent, width: 1),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
       ],
+      ),
     );
   }
+}
+
+/// Интихоби соҳа барои режими демо (бе вуруд).
+void showDemoPicker(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Text(ctx.tr('demo_title'), style: const TextStyle(color: AppColors.textPrimary)),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(ctx.tr('demo_pick_industry'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              const SizedBox(height: 12),
+              for (var i = 0; i < kIndustryOrder.length; i++)
+                FadeSlideIn(
+                  delay: staggerDelay(i, stepMs: 40),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: HoverLift(
+                      radius: 10,
+                      child: Material(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(10),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            context.read<AuthProvider>().enterDemo(kIndustryOrder[i]);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(children: [
+                              Icon(presetOf(kIndustryOrder[i]).icon, color: AppColors.primaryLight),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(presetOf(kIndustryOrder[i]).name(ctx.lang), style: const TextStyle(color: AppColors.textPrimary, fontSize: 14))),
+                              const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(ctx.tr('cancel')))],
+    ),
+  );
 }
