@@ -19,7 +19,7 @@ class OrgConfigProvider extends ChangeNotifier {
 
   /// Идемпотент: танҳо ҳангоми тағйири ширкат аз нав обуна мешавад.
   void bind(AppUser? user) {
-    final key = user == null ? null : user.orgId;
+    final key = user?.orgId;
     if (key == _boundKey) return;
     _boundKey = key;
     _sub?.cancel();
@@ -29,7 +29,11 @@ class OrgConfigProvider extends ChangeNotifier {
 
     if (user != null && user.orgId.isNotEmpty) {
       if (user.isDemo) {
-        _config = OrgConfig(industry: demoIndustryOf(user.orgId));
+        _config = OrgConfig(industry: demoIndustryOf(user.orgId), contacts: const [
+          ChannelContact(id: 'd1', type: 'telegram', value: '@senova_demo'),
+          ChannelContact(id: 'd2', type: 'whatsapp', value: '+992 900 00 00 00'),
+          ChannelContact(id: 'd3', type: 'instagram', value: 'senova.crm'),
+        ]);
         _org = Organization(id: user.orgId, name: 'Demo', createdAt: DateTime.now(), config: _config);
       } else {
         _sub = OrganizationService().watchOne(user.orgId).listen((o) {

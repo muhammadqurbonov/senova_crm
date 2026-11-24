@@ -69,11 +69,11 @@ class ResponsiveScaffold extends StatelessWidget {
       appBar: AppBar(
         toolbarHeight: 48,
         titleSpacing: 16,
-        title: Row(
+        title: const Row(
           children: [
-            const BrandMark(size: 26),
-            const SizedBox(width: 8),
-            const Text('Senova CRM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            BrandMark(size: 26),
+            SizedBox(width: 8),
+            Text('Senova CRM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           ],
         ),
         actions: [

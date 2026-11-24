@@ -1,11 +1,13 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import '../../core/channels.dart';
 import '../../core/constants.dart';
 import '../../core/errors.dart';
 import '../../core/industries.dart';
 import '../../core/industries_data.dart';
 import '../../core/l10n/app_lang.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/channel_widgets.dart';
 import '../../core/widgets/common.dart';
 import '../../models/org_config.dart';
 import '../../models/organization_model.dart';
@@ -29,6 +31,7 @@ class _OrgEditorDialogState extends State<OrgEditorDialog> {
   late Set<String> _modules;
   late List<CustomFieldDef> _customerFields;
   late List<CustomFieldDef> _itemFields;
+  late List<ChannelContact> _contacts;
   late final TextEditingController _lblCustomers;
   late final TextEditingController _lblItems;
   late final TextEditingController _lblDeals;
@@ -44,6 +47,7 @@ class _OrgEditorDialogState extends State<OrgEditorDialog> {
     _modules = {...c.modules};
     _customerFields = [...c.customerFields];
     _itemFields = [...c.itemFields];
+    _contacts = [...c.contacts];
     _lblCustomers = TextEditingController(text: c.labels['customers'] ?? '');
     _lblItems = TextEditingController(text: c.labels['items'] ?? '');
     _lblDeals = TextEditingController(text: c.labels['deals'] ?? '');
@@ -74,6 +78,7 @@ class _OrgEditorDialogState extends State<OrgEditorDialog> {
         labels: labels,
         customerFields: _customerFields,
         itemFields: _itemFields,
+        contacts: _contacts,
       );
       await OrganizationService().updateConfig(widget.org.id, {...cfg.toUpdate(), 'plan': _plan});
       AuditService(widget.org.id).log(widget.me, 'org.config', targetType: 'organization', targetId: widget.org.id, details: '${widget.org.name}: $_industry/$_plan');
@@ -156,6 +161,94 @@ class _OrgEditorDialogState extends State<OrgEditorDialog> {
     );
   }
 
+  void _addContact() {
+    final valueCtrl = TextEditingController();
+    final labelCtrl = TextEditingController();
+    String type = 'telegram';
+    String? error;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text(ctx.tr('add_channel'), style: const TextStyle(color: AppColors.textPrimary)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: type,
+                  isExpanded: true,
+                  dropdownColor: AppColors.surface,
+                  decoration: InputDecoration(labelText: ctx.tr('channel_type')),
+                  items: [
+                    for (final t in kContactTypes)
+                      DropdownMenuItem(
+                        value: t.id,
+                        child: Row(children: [
+                          Icon(t.icon, size: 18, color: t.color),
+                          const SizedBox(width: 10),
+                          Text(channelName(ctx, t)),
+                        ]),
+                      ),
+                  ],
+                  onChanged: (v) => setLocal(() => type = v ?? type),
+                ),
+                const SizedBox(height: 10),
+                TextField(controller: valueCtrl, decoration: InputDecoration(labelText: ctx.tr('channel_value'), helperText: ctx.tr('channel_value_hint'), helperMaxLines: 2)),
+                const SizedBox(height: 10),
+                TextField(controller: labelCtrl, decoration: InputDecoration(labelText: ctx.tr('channel_label'))),
+                if (error != null)
+                  Padding(padding: const EdgeInsets.only(top: 8), child: Text(error!, style: const TextStyle(color: AppColors.danger, fontSize: 12))),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(ctx.tr('cancel'))),
+            FilledButton(
+              onPressed: () {
+                if (channelUrl(type, valueCtrl.text) == null) {
+                  setLocal(() => error = ctx.tr('err_channel_value'));
+                  return;
+                }
+                setState(() => _contacts.add(ChannelContact(
+                      id: 'ch_${DateTime.now().millisecondsSinceEpoch}',
+                      type: type,
+                      value: valueCtrl.text.trim(),
+                      label: labelCtrl.text.trim(),
+                    )));
+                Navigator.pop(ctx);
+              },
+              child: Text(ctx.tr('add')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _contactsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Expanded(child: Text(context.tr('channels_contacts'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600))),
+          TextButton.icon(onPressed: _addContact, icon: const Icon(Icons.add, size: 16), label: Text(context.tr('add_channel'))),
+        ]),
+        if (_contacts.isEmpty) Text(context.tr('no_channels'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        for (final c in _contacts)
+          ChannelRow(
+            contact: c,
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.danger),
+              onPressed: () => setState(() => _contacts.remove(c)),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _fieldsSection(String titleKey, List<CustomFieldDef> list, bool customer) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,6 +322,8 @@ class _OrgEditorDialogState extends State<OrgEditorDialog> {
               _fieldsSection('fields_customer', _customerFields, true),
               const SizedBox(height: 8),
               _fieldsSection('fields_item', _itemFields, false),
+              const Divider(color: AppColors.border, height: 28),
+              _contactsSection(),
               const Divider(color: AppColors.border, height: 28),
               Text(context.tr('integrations'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),

@@ -3,6 +3,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 
+import 'package:imkon_crm/core/channels.dart';
 import 'package:imkon_crm/core/constants.dart';
 import 'package:imkon_crm/core/demo/demo_data.dart';
 import 'package:imkon_crm/core/industries.dart';
@@ -240,6 +241,52 @@ void main() {
           expect(items.any((p) => p.id == d.propertyId), isTrue, reason: '$id ${d.id}');
         }
       }
+    });
+  });
+
+  group('Channels', () {
+    test('telegram handle and phone', () {
+      expect(channelUrl('telegram', '@senova'), 'https://t.me/senova');
+      expect(channelUrl('telegram', '+992 900 11 22 33'), 'https://t.me/+992900112233');
+      expect(channelUrl('telegram', 'bad handle'), isNull);
+    });
+    test('whatsapp needs a real number', () {
+      expect(channelUrl('whatsapp', '+992 900 11 22 33'), 'https://wa.me/992900112233');
+      expect(channelUrl('whatsapp', 'abc'), isNull);
+    });
+    test('instagram, facebook, tiktok, vk handles', () {
+      expect(channelUrl('instagram', '@senova.crm'), 'https://instagram.com/senova.crm');
+      expect(channelUrl('facebook', 'senova'), 'https://facebook.com/senova');
+      expect(channelUrl('tiktok', 'senova'), 'https://www.tiktok.com/@senova');
+      expect(channelUrl('vk', 'senova'), 'https://vk.com/senova');
+    });
+    test('full links pass through only for safe schemes', () {
+      expect(channelUrl('instagram', 'https://instagram.com/x'), 'https://instagram.com/x');
+      expect(channelUrl('website', 'javascript://x'), isNull);
+      expect(channelUrl('other', 'file:///etc/passwd'), isNull);
+    });
+    test('email, phone, website, empty', () {
+      expect(channelUrl('email', 'a@b.tj'), 'mailto:a@b.tj');
+      expect(channelUrl('email', 'nope'), isNull);
+      expect(channelUrl('phone', '+992 900 11 22 33'), 'tel:+992900112233');
+      expect(channelUrl('website', 'senova.tj'), 'https://senova.tj');
+      expect(channelUrl('telegram', '  '), isNull);
+    });
+    test('contacts round-trip through OrgConfig', () {
+      final c = OrgConfig.fromMap({
+        'contacts': [
+          {'id': 'a', 'type': 'telegram', 'value': '@x', 'label': 'Support'},
+          {'id': '', 'type': 'telegram', 'value': '@bad'},
+          {'id': 'b', 'type': 'whatsapp', 'value': ''},
+        ],
+      });
+      expect(c.contacts.length, 1);
+      expect(c.toUpdate()['contacts'], [
+        {'id': 'a', 'type': 'telegram', 'value': '@x', 'label': 'Support'},
+      ]);
+    });
+    test('unknown channel type falls back to other', () {
+      expect(channelTypeOf('nope').id, 'other');
     });
   });
 }

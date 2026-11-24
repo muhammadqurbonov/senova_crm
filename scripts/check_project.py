@@ -18,6 +18,7 @@ dynamic = ['role_admin','role_manager','role_viewer','pstatus_available','pstatu
            'filter_all','filter_open','filter_closed','filter_rejected','deal_open','deal_closed','deal_closed_won','deal_rejected',
            'nav_dashboard','nav_customers','nav_properties','nav_deals','nav_tasks','nav_settings',
            'tab_stages','tab_employees','tab_audit','tab_organizations','org_status_active','org_status_suspended','activate','suspend']
+dynamic += ['ch_website','ch_email','ch_phone','ch_other']
 dynamic += ['int_telegram','int_whatsapp','int_instagram','int_facebook','module_items','module_deals','module_tasks','type_text','type_number','type_select','type_bool','type_date']
 dynamic += [f'err_{x}' for x in ['invalid_credentials','profile_missing','account_disabled','generic','network','permission_denied','email_in_use','weak_password','too_many_requests','login_taken']]
 used.update(dynamic)
@@ -59,10 +60,9 @@ for p in files:
 
 # 4. bracket balance (strings/comments stripped)
 def strip(s):
-    s = re.sub(r"//[^\n]*", '', s)
-    s = re.sub(r"'(?:\\.|[^'\\\n])*'", "''", s)
-    s = re.sub(r'"(?:\\.|[^"\\\n])*"', '""', s)
-    return s
+    # як гузариш: сатрҳо ва шарҳҳо якҷоя, то '//' дар дохили 'https://...' шарҳ ҳисоб нашавад
+    pat = re.compile(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|//[^\n]*")
+    return pat.sub(lambda m: "''" if m.group(0)[0] in "'\"" else '', s)
 for p in files:
     s = strip(open(p, encoding='utf-8').read())
     for a, b in ['()', '[]', '{}']:

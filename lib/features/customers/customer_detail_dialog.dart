@@ -5,11 +5,13 @@ import '../../core/format.dart';
 import '../../core/l10n/app_lang.dart';
 import '../../core/permissions.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/channel_widgets.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/custom_fields.dart';
 import '../../models/customer_model.dart';
 import '../../models/deal_model.dart';
 import '../../models/note_model.dart';
+import '../../models/org_config.dart';
 import '../../models/pipeline_stage_model.dart';
 import '../../models/property_model.dart';
 import '../../models/user_model.dart';
@@ -21,7 +23,6 @@ import '../../services/deal_service.dart';
 import '../../services/note_service.dart';
 import '../../services/pipeline_stage_service.dart';
 import '../../services/property_service.dart';
-import '../../models/org_config.dart';
 
 class CustomerDetailDialog extends StatefulWidget {
   final Customer customer;
@@ -73,7 +74,8 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
     final me = _me;
     if (me == null) return const SizedBox();
     final canWrite = Permissions.canWrite(me);
-    final fields = context.watch<OrgConfigProvider>().config.customerFields;
+    final orgCfg = context.watch<OrgConfigProvider>().config;
+    final fields = orgCfg.customerFields;
 
     return Dialog(
       backgroundColor: AppColors.surface,
@@ -103,6 +105,7 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
               for (final f in fields)
                 if (c.custom[f.id] != null)
                   _infoRow(f.label, displayCustomValue(f, c.custom[f.id], yes: context.tr('yes'), no: context.tr('no'))),
+              QuickContactBar(phone: c.phone, companyChannels: orgCfg.contacts),
               const SizedBox(height: 10),
               StreamBuilder<List<PipelineStage>>(
                 stream: _stagesStream,
@@ -136,7 +139,7 @@ class _CustomerDetailDialogState extends State<CustomerDetailDialog> {
                                   try {
                                     await _customerService!.updateStage(c.id, newKey);
                                   } catch (e) {
-                                    if (!mounted) return;
+                                    if (!mounted || !context.mounted) return;
                                     setState(() => _currentStageId = previous);
                                     showSnack(context, context.tr(errorKeyFor(e)), error: true);
                                   }

@@ -15,6 +15,7 @@ import '../../services/audit_service.dart';
 import '../../core/industries.dart';
 import '../../core/industries_data.dart';
 import '../../providers/org_config_provider.dart';
+import '../../core/widgets/channel_widgets.dart';
 import 'org_editor_dialog.dart';
 import '../../services/employee_service.dart';
 import '../../services/organization_service.dart';
@@ -761,6 +762,13 @@ class _IntegrationsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.only(top: 12),
       children: [
+        Text(context.tr('company_channels'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        if (cfg.contacts.isEmpty) Text(context.tr('no_channels'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+        for (final c in cfg.contacts) ChannelRow(contact: c),
+        const SizedBox(height: 16),
+        Text(context.tr('integrations'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
         Text(context.tr('int_admin_hint'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
         const SizedBox(height: 12),
         for (final ch in kChannels)
